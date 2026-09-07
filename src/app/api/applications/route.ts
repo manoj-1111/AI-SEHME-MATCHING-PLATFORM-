@@ -5,8 +5,14 @@ import { ensureSeeded } from "@/db/seed";
 import { eq, desc, and } from "drizzle-orm";
 import type { TimelineEntry } from "@/types";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   try {
+    if (!process.env.DATABASE_URL) {
+      return NextResponse.json({ applications: [] });
+    }
+
     await ensureSeeded();
     const { searchParams } = new URL(req.url);
     const userId = Number(searchParams.get("userId") ?? 0);
@@ -26,7 +32,6 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    await ensureSeeded();
     const body = (await req.json()) as {
       userId: number;
       schemeId: string;
@@ -34,6 +39,27 @@ export async function POST(req: NextRequest) {
     };
     if (!body.userId || !body.schemeId)
       return NextResponse.json({ error: "userId and schemeId required" }, { status: 400 });
+
+    if (!process.env.DATABASE_URL) {
+      return NextResponse.json({
+        application: {
+          id: Date.now(),
+          userId: body.userId,
+          schemeId: body.schemeId,
+          schemeName: body.schemeName,
+          status: "Not Started",
+          timeline: [
+            {
+              status: "Not Started",
+              date: new Date().toISOString(),
+              note: "Application tracking started (demo)",
+            },
+          ],
+        },
+      });
+    }
+
+    await ensureSeeded();
 
     const existing = (
       await db
@@ -74,6 +100,17 @@ export async function PATCH(req: NextRequest) {
     const body = (await req.json()) as { id: number; status: string; note?: string };
     if (!body.id || !body.status)
       return NextResponse.json({ error: "id and status required" }, { status: 400 });
+
+    if (!process.env.DATABASE_URL) {
+      return NextResponse.json({
+        application: {
+          id: body.id,
+          status: body.status,
+          updatedAt: new Date(),
+        },
+      });
+    }
+
     const row = (
       await db.select().from(applications).where(eq(applications.id, body.id))
     )[0];

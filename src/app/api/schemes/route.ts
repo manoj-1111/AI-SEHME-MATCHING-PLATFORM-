@@ -2,16 +2,34 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { schemes } from "@/db/schema";
 import { ensureSeeded } from "@/db/seed";
+import { SCHEMES } from "@/data/schemes";
 import { eq } from "drizzle-orm";
 import type { Scheme } from "@/types";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   try {
-    await ensureSeeded();
     const { searchParams } = new URL(req.url);
     const q = searchParams.get("q")?.toLowerCase() ?? "";
     const includeInactive = searchParams.get("all") === "1";
 
+    if (!process.env.DATABASE_URL) {
+      let list = SCHEMES;
+      if (q) {
+        list = list.filter(
+          (s) =>
+            s.name.toLowerCase().includes(q) ||
+            s.ministry.toLowerCase().includes(q) ||
+            s.description.toLowerCase().includes(q) ||
+            s.sectors.some((sec) => sec.toLowerCase().includes(q)) ||
+            s.tags.some((t) => t.toLowerCase().includes(q)),
+        );
+      }
+      return NextResponse.json({ schemes: list });
+    }
+
+    await ensureSeeded();
     const rows = await db.select().from(schemes);
     let list = rows
       .filter((r) => includeInactive || r.isActive)

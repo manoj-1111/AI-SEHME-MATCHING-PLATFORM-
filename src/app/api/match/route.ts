@@ -3,12 +3,14 @@ import { db } from "@/db";
 import { schemes, matchRuns, profiles, users } from "@/db/schema";
 import { ensureSeeded } from "@/db/seed";
 import { matchSchemes } from "@/lib/matching/engine";
+import { SCHEMES } from "@/data/schemes";
 import type { Scheme, UserProfile } from "@/types";
 import { eq } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
   try {
-    await ensureSeeded();
     const body = (await req.json()) as { profile: UserProfile; userId?: number };
     const profile = body.profile;
     if (!profile || !profile.state || !profile.category)
@@ -17,6 +19,12 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
 
+    if (!process.env.DATABASE_URL) {
+      const { eligible, ineligible } = matchSchemes(profile, SCHEMES);
+      return NextResponse.json({ eligible, ineligible });
+    }
+
+    await ensureSeeded();
     const rows = await db.select().from(schemes).where(eq(schemes.isActive, true));
     const list = rows.map((r) => ({
       ...(r.data as Scheme),

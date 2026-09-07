@@ -79,7 +79,7 @@ const DEMO_USERS = [
 ];
 
 export async function ensureSeeded() {
-  if (seeded) return;
+  if (!process.env.DATABASE_URL || seeded) return;
   try {
     const schemeCount = await db
       .select({ c: sql<number>`count(*)::int` })
